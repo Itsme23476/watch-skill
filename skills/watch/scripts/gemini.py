@@ -37,6 +37,14 @@ PROMPT_SUFFIX = ('\n\nCite an MM:SS (or H:MM:SS) timestamp for every claim about
                  'show or say something needed to answer, say so plainly instead of guessing.')
 
 
+_CITED = re.compile(r'(?<![\d:])(?:\d{1,2}:)?[0-5]?\d:[0-5]\d(?![\d:])')
+
+
+def cited_timestamps(text: str) -> list[str]:
+    """MM:SS / H:MM:SS stamps Gemini cited, in first-seen order, without repeats."""
+    return list(dict.fromkeys(_CITED.findall(text or '')))
+
+
 def is_youtube(source: str) -> bool:
     return bool(_YOUTUBE.match(source or ''))
 

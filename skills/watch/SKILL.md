@@ -101,6 +101,11 @@ python3 "${SKILL_DIR}/scripts/watch.py" "<URL-or-local-path>" --question "<the u
 
 `--engine auto|gemini|local` overrides the saved `WATCH_ENGINE` for one run; `auto` uses Gemini whenever `GEMINI_API_KEY` resolves (environment → `~/.config/watch/.env` → cwd `.env`).
 
+### Verify and clip
+
+- **Verify Gemini's timestamps** whenever the user needs to act on an exact moment (finding a scene, quoting on-screen text, timing a cut): rerun or run with `--verify`. The report gains `## Verify frames` with one frame per cited time. Read every frame, then tell the user which of Gemini's claims you confirmed and correct any that don't match what the frame shows. YouTube media is downloaded for this, so it needs `yt-dlp`. If the section says verification is unavailable, relay the answer as unverified.
+- **Cut a moment** the user wants to keep or edit: `--clip "<path>.mp4" --start T --end T`. Pad a second either side of the moment unless the user gave an exact range. The cut is re-encoded so it starts on the exact frame; the command refuses to overwrite an existing file. Write the clip where the user asked, or next to their working files, never inside a run's work dir.
+
 **No silent fallback.** If a Gemini run fails (`## Unavailable evidence` with a `Gemini <category>:` line), tell the user what failed and offer to rerun with `--engine local`. Do not switch engines without asking: the user may not want a long download, or may have chosen Gemini deliberately. Likewise use `--engine local` when the user says the video is private or must not leave the machine.
 
 | Option | Behavior |
@@ -120,6 +125,8 @@ python3 "${SKILL_DIR}/scripts/watch.py" "<URL-or-local-path>" --question "<the u
 | `--cookies FILE` | Explicit cookie jar; yt-dlp may update it |
 | `--cookies-from-browser BROWSER` | Explicit browser selector, including a profile if supplied; conflicts with `--cookies` |
 | `--out-dir DIR` | Create this run's disposable child directory inside DIR |
+| `--verify` | Gemini engine: extract one real frame at every timestamp Gemini cites (max 12) |
+| `--clip OUT --start T --end T` | Cut that range of the source into OUT (e.g. `clip.mp4`) and stop; works with either engine |
 
 Watch settings use CLI → environment → `~/.config/watch/.env` → defaults. Cookie options are opt-in and shared by metadata, caption, and media stages. If no watch cookie option is set, existing yt-dlp configuration remains active, including proxy/CA/auth settings. Do not inspect browser sessions automatically.
 

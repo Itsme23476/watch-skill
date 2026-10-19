@@ -23,11 +23,49 @@ from download import download, fetch_captions, is_url, auth_args  # noqa: E402
 from frames import MAX_FPS, auto_fps, auto_fps_focus, extract_at_timestamps, extract_keyframes, extract_scene_or_uniform, format_time, get_metadata, merge_frames, parse_time, parse_timestamps, validate_controls  # noqa: E402
 from transcribe import filter_range, format_transcript, parse_vtt  # noqa: E402
 from whisper import load_api_key, transcribe_video  # noqa: E402
-from runtime import configure_stdio  # noqa: E402
+from runtime import configure_stdio, diagnostic, run_text  # noqa: E402
 
 
 LOCAL_ONLY_FLAGS = (("--detail", "detail"), ("--fps", "fps"), ("--max-frames", "max_frames"),
                     ("--timestamps", "timestamps"), ("--whisper", "whisper"), ("--sub-lang", "sub_lang"))
+VERIFY_MAX_FRAMES = 12  # Cited stamps beyond this are even-sampled; enough to spot-check an answer.
+
+
+def run_clip(args, start_sec, end_sec, auth) -> int:
+    """Cut [start, end] of the source into args.clip. Re-encodes so the cut lands on the exact frame."""
+    out = Path(args.clip).expanduser().resolve()
+    if out.exists():
+        raise SystemExit(f"--clip target already exists: {out}")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    work = None
+    try:
+        if is_url(args.source):
+            parent = Path(args.out_dir).expanduser().resolve() if args.out_dir else None
+            if parent:
+                parent.mkdir(parents=True, exist_ok=True)
+            work = Path(tempfile.mkdtemp(prefix="watch-", dir=parent))
+            print("[watch] downloading media…", file=sys.stderr)
+        media = download(args.source, work / "download" if work else Path("."), **(auth if work else {}))
+        print(f"[watch] cutting {format_time(start_sec)} → {format_time(end_sec)}…", file=sys.stderr)
+        result = run_text([
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-n",
+            "-ss", f"{start_sec:.3f}", "-i", media["video_path"], "-t", f"{end_sec - start_sec:.3f}",
+            "-map", "0:v?", "-map", "0:a?", str(out),
+        ])
+        if result.returncode != 0:
+            raise SystemExit(f"ffmpeg clip failed: {diagnostic(result.stderr)}")
+        length = get_metadata(str(out))["duration_seconds"]
+    finally:
+        if work:  # Only the downloaded copy; the clip is written outside it.
+            shutil.rmtree(work, ignore_errors=True)
+
+    print()
+    print("# watch: clip")
+    print()
+    print(f"- **Source:** {args.source}")
+    print(f"- **Range:** {format_time(start_sec)} → {format_time(end_sec)}")
+    print(f"- **Saved:** `{out}` ({length:.1f}s)")
+    return 0
 
 
 def run_gemini(args, config, key, start_sec, end_sec, auth) -> int:
@@ -36,17 +74,23 @@ def run_gemini(args, config, key, start_sec, end_sec, auth) -> int:
     ignored += [flag for flag, on in (("--no-whisper", args.no_whisper), ("--no-dedup", args.no_dedup)) if on]
     clip = (start_sec, end_sec) if start_sec is not None or end_sec is not None else None
     uploaded, warning, result, error, sent, work = None, None, None, None, "URL sent to Google", None
+    media, cited, verify_frames, verify_error = None, [], [], None
+
+    def fetch_media():
+        nonlocal work
+        parent = Path(args.out_dir).expanduser().resolve() if args.out_dir else None
+        if parent:
+            parent.mkdir(parents=True, exist_ok=True)
+        work = Path(tempfile.mkdtemp(prefix="watch-", dir=parent))
+        print("[watch] downloading media…" if is_url(args.source) else "[watch] using local file…", file=sys.stderr)
+        return download(args.source, work / "download", **(auth if is_url(args.source) else {}))
+
     try:
         if gemini.is_youtube(args.source):
             video = {"uri": args.source}
         else:
-            parent = Path(args.out_dir).expanduser().resolve() if args.out_dir else None
-            if parent:
-                parent.mkdir(parents=True, exist_ok=True)
             sent = "not sent to Google"
-            work = Path(tempfile.mkdtemp(prefix="watch-", dir=parent))
-            print("[watch] downloading media…" if is_url(args.source) else "[watch] using local file…", file=sys.stderr)
-            media = download(args.source, work / "download", **(auth if is_url(args.source) else {}))
+            media = fetch_media()
             sent = "upload to Google failed"
             print("[watch] uploading to the Gemini Files API…", file=sys.stderr)
             uploaded = gemini.upload_file(Path(media["video_path"]), key)
@@ -60,8 +104,23 @@ def run_gemini(args, config, key, start_sec, end_sec, auth) -> int:
     finally:
         if uploaded:
             warning = gemini.delete_file(uploaded["name"], key)
-        if work:  # Run-owned; holds at most a downloaded copy. A local source file lives elsewhere.
-            shutil.rmtree(work, ignore_errors=True)
+
+    if result and args.verify:
+        # Gemini's timestamps are claims; pull the real pixels so the agent can check them.
+        cited = gemini.cited_timestamps(result["text"])
+        try:
+            if not cited:
+                raise SystemExit("Gemini cited no timestamps to check.")
+            if media is None:
+                media = fetch_media()
+            verify_frames, _ = extract_at_timestamps(media["video_path"], work / "frames", cited,
+                                                     resolution=args.resolution, max_frames=VERIFY_MAX_FRAMES)
+            if not verify_frames:
+                raise SystemExit("none of the cited timestamps fall inside the video.")
+        except SystemExit as exc:
+            verify_error = str(exc)
+    if work and not verify_frames:  # Run-owned; holds at most a downloaded copy. A local source file lives elsewhere.
+        shutil.rmtree(work, ignore_errors=True)
 
     print()
     print("# watch: video report")
@@ -88,6 +147,23 @@ def run_gemini(args, config, key, start_sec, end_sec, auth) -> int:
           "Relay them as such; rerun with `--engine local` to inspect frames directly._")
     print()
     print(result["text"])
+    if args.verify:
+        print()
+        print("## Verify frames")
+        print()
+        if verify_error:
+            print(f"_Verification unavailable: {verify_error} Relay Gemini's answer as unverified._")
+        else:
+            print(f"_Gemini cited {len(cited)} timestamp{'s' if len(cited) != 1 else ''}; "
+                  f"{len(verify_frames)} real frame{'s' if len(verify_frames) != 1 else ''} extracted. "
+                  "**Read each frame** and check it shows what Gemini claims at that time. "
+                  "Say which claims you confirmed and correct any that do not match._")
+            print()
+            for frame in verify_frames:
+                print(f"- `{frame['path']}` (t={format_time(frame['timestamp_seconds'])}, "
+                      f"cited {format_time(frame['requested_timestamp_seconds'])})")
+            print()
+            print(f"_Work dir: `{work}` — delete when done._")
     return 0
 
 
@@ -144,9 +220,17 @@ def main() -> int:
                          "local: frames + transcript on this machine. Default auto: gemini when a key exists.")
     ap.add_argument("--question", default=None,
                     help="The user's question. Sent to Gemini on a gemini run; unused by the local engine.")
+    ap.add_argument("--verify", action="store_true",
+                    help="Gemini engine: extract a real frame at every timestamp Gemini cites so the "
+                         "agent can check the answer. Downloads YouTube media for this.")
+    ap.add_argument("--clip", default=None, metavar="OUT",
+                    help="Cut --start..--end from the source into OUT (e.g. clip.mp4) and stop. "
+                         "No frames, transcript, or Gemini call.")
     args = ap.parse_args()
     if args.no_whisper and args.whisper:
         ap.error("--no-whisper conflicts with --whisper")
+    if args.clip and (args.start is None or args.end is None):
+        ap.error("--clip needs both --start and --end")
 
     config = get_config(backend_override="none" if args.no_whisper else args.whisper)
     detail = args.detail or config["detail"]
@@ -160,6 +244,8 @@ def main() -> int:
     cookies_browser = args.cookies_from_browser if args.cookies_from_browser is not None else (None if args.cookies else config["cookies_from_browser"])
     auth_args(cookies_file, cookies_browser)  # Validate even before starting network work.
     auth = {"cookies_file": cookies_file, "cookies_from_browser": cookies_browser}
+    if args.clip:
+        return run_clip(args, start_sec, end_sec, auth)
 
     gemini_key = load_gemini_key()
     if resolve_engine(args.engine or config["engine"], bool(gemini_key)) == "gemini":
