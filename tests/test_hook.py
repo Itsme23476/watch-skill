@@ -18,9 +18,23 @@ def test_hook_handles_setup_failure_and_spaced_plugin_path(tmp_path, code):
     script = plugin / 'skills/watch/scripts/setup.py'
     script.parent.mkdir(parents=True)
     script.write_text(f'raise SystemExit({code})\n')
+    config = Path(os.environ['HOME']) / '.config/watch/.env'
+    config.parent.mkdir(parents=True)
+    config.write_text('SETUP_COMPLETE="true"\n')
     result = subprocess.run([bash, str(HOOK)], env={**os.environ, 'CLAUDE_PLUGIN_ROOT': str(plugin)}, capture_output=True, text=True)
     assert result.returncode == 0
     assert bool(result.stdout) == bool(code)
+
+
+def test_hook_nudges_a_fresh_install_toward_the_gemini_key(tmp_path):
+    bash = shutil.which('bash')
+    if not bash or os.name == 'nt':
+        pytest.skip('Bash fixture runs on POSIX')
+    script = tmp_path / 'skills/watch/scripts/setup.py'
+    script.parent.mkdir(parents=True)
+    script.write_text('raise SystemExit(0)\n')
+    result = subprocess.run([bash, str(HOOK)], env={**os.environ, 'CLAUDE_PLUGIN_ROOT': str(tmp_path)}, capture_output=True, text=True)
+    assert result.returncode == 0 and 'Gemini API key' in result.stdout
 
 
 def test_hook_handles_broken_interpreters(tmp_path):

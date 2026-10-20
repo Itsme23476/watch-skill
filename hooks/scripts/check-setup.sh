@@ -6,6 +6,10 @@ SETUP_SCRIPT="$PLUGIN_DIR/skills/watch/scripts/setup.py"
 for interpreter in python3 python; do
   if command -v "$interpreter" >/dev/null 2>&1 && "$interpreter" -c 'import sys; sys.exit(sys.version_info < (3, 10))' >/dev/null 2>&1; then
     if "$interpreter" "$SETUP_SCRIPT" --check >/dev/null 2>&1; then
+      # Fresh install: nudge the user into the wizard so the Gemini key question comes first.
+      if ! grep -Eqs '^SETUP_COMPLETE="?true"?$' "$HOME/.config/watch/.env"; then
+        echo '/watch is installed but not set up. Invoke the watch skill to finish setup; it starts by asking for a free Gemini API key.'
+      fi
       exit 0
     fi
     echo '/watch: setup needs attention. Invoke the watch skill to check dependencies and configuration.'

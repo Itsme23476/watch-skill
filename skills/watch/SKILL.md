@@ -33,54 +33,49 @@ python3 "${SKILL_DIR}/scripts/setup.py" --json
 
 - `can_proceed` depends on base binaries for the local engine, not optional credentials. If it is false, run `setup.py` and confirm the binaries become available. macOS uses Homebrew; other systems get package commands. Do not use sudo automatically. With the Gemini engine (`engine` is `gemini`, `binaries_required` false), missing `ffmpeg`/`yt-dlp` do not block YouTube URLs but are still needed for other URLs and for `--engine local`; mention `missing_binaries` only when that matters.
 - If `first_run` is false, proceed without announcing successful setup or asking preferences again. Existing installations without a backend setting retain `auto` (Groq key first, then OpenAI).
-- If `first_run` is true, ask the engine question first, then (local engine only) the two choices below it. The wizard does not inspect RAM, disk, CPU, browser sessions, or other machine state; the user decides from the stated requirements.
+- If `first_run` is true, run the wizard below. Do not skip step 1, even when the user only asked to install watch. The wizard does not inspect RAM, disk, CPU, browser sessions, or other machine state; the user decides from the stated requirements.
 
-**Question 1 — "How should watch view videos?"**
+**Step 1 — ask for a Gemini API key before anything else.** Tell the user, in plain words:
 
-- `gemini` (recommended) — Google's Gemini model watches the whole video, including audio, and answers directly. Needs a free key from https://aistudio.google.com/apikey. YouTube URLs are sent to Google; local or downloaded videos are uploaded to Google, then deleted after the answer.
-- `local` — frames + transcript extracted on this machine and read by you. No key needed.
+- With a free Gemini API key, watch **sees the video**: what is shown on screen (slides, charts, code, text, people) as well as what is said, with timestamps. YouTube links are sent to Google, not downloaded.
+- **Without a key, watch only reads the transcript.** It knows what is said, but it cannot see the images in the video.
+- The key is free at https://aistudio.google.com/apikey. It stays free **only if the Google project has no billing account linked**; a project with billing enabled is on a paid tier and is charged. The free tier currently covers up to 8 hours of YouTube video per day, and Google may use free-tier content to improve its products.
 
-If `gemini`, run:
+Then ask whether they want to add a key now.
+
+**If they give a key** (or want to add one), run:
 
 ```bash
 python3 "${SKILL_DIR}/scripts/setup.py" --engine gemini
 ```
 
-Exit 3 means the key is missing; the command has created `~/.config/watch/.env` for it. Point the user to https://aistudio.google.com/apikey for a free key and let them choose how to add it:
+Exit 3 means the key is missing; the command has created `~/.config/watch/.env` for it. Let the user choose how to add it:
 
 - **Paste it in chat.** Write it on the `GEMINI_API_KEY=` line of the config file (add the line if it is missing) with a file-editing tool, preserving the other lines.
 - **Add it themselves.** Offer to open the config file in their text editor (`open -t` on macOS, `notepad` on Windows, `xdg-open` on Linux) so they can paste the key after `GEMINI_API_KEY=` and save. This only works when you run on the user's own computer; otherwise give them the file path.
 
-Never print the key or put it in a shell command. Once it is saved, rerun `setup.py --engine gemini`. On exit 0 setup is complete — **skip the detail and transcription questions**; they only apply to the local engine. If `local`: run `setup.py --engine local` (this also installs missing base binaries and scaffolds the private config) and continue with the two questions below. An existing explicit `WATCH_ENGINE` is not asked again.
+Never print the key or put it in a shell command. Once it is saved, rerun `setup.py --engine gemini`. On exit 0 setup is complete; ask nothing else. Suggest `brew install yt-dlp` (or the platform equivalent) only if `missing_binaries` is non-empty and they want `--verify`, `--clip`, or non-YouTube links.
 
-Ask for the default detail, lightest to heaviest:
-
-1. `transcript`: no frames; skip media download when captions are available.
-2. `efficient`: fast keyframe selection, cap 50.
-3. `balanced` (recommended): scene-aware frames, cap 100.
-4. `token-burner`: scene-aware, uncapped; high image cost.
-
-If the detail question is skipped, retain `balanced`.
-
-Then ask: **For videos without captions, how should watch transcribe?** Present:
-
-1. `whisperx` (recommended): local transcription, no API key; audio stays on the machine. One-time download of about 1.5 GB. Requires 3 GB free disk, 8 GB RAM, and a compatible 64-bit CPU. Apple Silicon macOS is verified; Linux/Windows recipes and Intel macOS are untested.
-2. `groq`: fast cloud transcription, needs a Groq key.
-3. `openai`: cloud transcription, needs an OpenAI key.
-4. `none`: captions only; no speech fallback.
-
-Use an existing explicit backend choice without asking again. Do not treat silence as permission to install local models or upload audio; the no-key/no-install path remains available.
-
-Complete the selected setup using the user's detail value:
+**If they decline, or have no key yet**, repeat once that watch will only read transcripts, not the video's images, and that they can add a key at any time by asking you to set up Gemini. Then run:
 
 ```bash
-python3 "${SKILL_DIR}/scripts/setup.py" --backend whisperx --detail balanced
-# Or: --backend groq / openai / none
+python3 "${SKILL_DIR}/scripts/setup.py" --engine local --detail transcript --backend none
 ```
 
-For WhisperX, relay progress while the installer provisions uv, Python 3.12, pinned dependencies, and both model caches. `setup.py --install-whisperx` reruns this managed installer if needed. It writes the backend, executable, model, and completion marker only after warm-up succeeds. A failed local installation never selects a cloud backend automatically.
+This also installs missing base binaries. Setup is complete; ask nothing else. Videos without captions get no transcript until a transcription backend is chosen.
 
-For cloud, get the matching key the same way as the Gemini key (pasted in chat, or the user adds it after offering to open the config file), then rerun `setup.py --backend groq` or `--backend openai`. Preserve existing keys and comments; do not print keys or include them in a shell command. The script marks setup complete after that backend is ready. `--backend none` needs no key and completes immediately.
+**Later changes.** When the user adds a key later, run `setup.py --engine gemini` as above. If a no-key user asks to actually see a video, explain the two options: add a Gemini key (recommended, free), or local frames, where you view extracted frames yourself and use a lot more of their usage; for local frames, rerun with `--detail balanced`. If they want speech transcribed for videos without captions, offer the fallback backends:
+
+1. `whisperx`: local transcription, no API key; audio stays on the machine. One-time download of about 1.5 GB. Requires 3 GB free disk, 8 GB RAM, and a compatible 64-bit CPU. Apple Silicon macOS is verified; Linux/Windows recipes and Intel macOS are untested.
+2. `groq`: fast cloud transcription, needs a Groq key.
+3. `openai`: cloud transcription, needs an OpenAI key.
+
+```bash
+python3 "${SKILL_DIR}/scripts/setup.py" --backend whisperx
+# Or: --backend groq / openai
+```
+
+Do not treat silence as permission to install local models or upload audio. For WhisperX, relay progress while the installer provisions uv, Python 3.12, pinned dependencies, and both model caches; `setup.py --install-whisperx` reruns it if needed. A failed local installation never selects a cloud backend automatically. For a cloud backend, get its key the same way as the Gemini key, then rerun `setup.py --backend groq` or `--backend openai`. Preserve existing keys and comments; do not print keys or include them in a shell command.
 
 `setup.py --check` is a fast, silent base preflight: exit 0 when binaries exist (or the Gemini engine is active), 2 for missing dependencies/config errors. It never starts Torch or queries network services. `--json` adds `engine` (resolved: `gemini` or `local`), `configured_engine`, `gemini_key_present` (boolean only), `gemini_model`, `binaries_required`, executable paths/versions, offline yt-dlp capability diagnostics, and `whisperx_ready`, `whisperx_bin`, `whisperx_model`, and `backend_ready`. Local readiness in detailed mode checks the sentinel and executable help. Optional fallback failure does not block base watch.
 
