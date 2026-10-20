@@ -2,6 +2,23 @@
 
 Give an agent video evidence: a URL or local file becomes timestamped frames and a transcript. Install it in Claude Code (the desktop app, VS Code, or a terminal), or use it with Codex and other [Agent Skills](https://agentskills.io) hosts. Native captions come first; optional local WhisperX or Groq/OpenAI transcription handles videos without captions.
 
+> **Credit:** this is a fork of [bradautomates/claude-video](https://github.com/bradautomates/claude-video) by [Brad Bonanno](https://www.youtube.com/@bradbonanno) (MIT). All the original work is his; this fork adds the features below.
+
+## What this fork adds
+
+- **`--verify`: Claude checks Gemini's work.** Gemini watches the video and cites timestamps. With `--verify`, the skill grabs the real frame at each cited time (up to 12) so Claude can confirm or correct every claim. Gemini *does* get things wrong: in testing it described a table at 06:00 where the real frame showed a company logo.
+- **`--clip out.mp4 --start T --end T`: cut the moment you found** into its own file, frame-accurate, ready for your editor. It never overwrites an existing file.
+- **Key-first setup.** The first run asks for a free Gemini API key and explains the trade-off: with a key, watch sees what is *shown* on screen; without one, it only reads the transcript.
+
+> **Is it free?** The Gemini key is free from [Google AI Studio](https://aistudio.google.com/apikey) **only while your Google project has no billing account linked.** With billing on, you are on a paid tier and get charged. The free tier currently allows up to 8 hours of YouTube video per day, and Google may use free-tier content to improve its products.
+
+### Quick install (paste one message)
+
+- **Claude Code** (desktop app Code tab, VS Code, or terminal): *"Install the watch plugin from https://github.com/Itsme23476/watch-skill as a marketplace plugin."*
+- **Codex**: *"Use $skill-installer to install the watch skill from https://github.com/Itsme23476/watch-skill/tree/main/skills/watch"*
+
+Then start a new session and type `/watch`. If you already have Brad's original watch installed, remove it first so you don't end up with two `/watch` commands.
+
 ## Choose your app
 
 **Using Claude? Run Watch in Claude Code.** Install it through Claude Desktop and use a **Code** session, or add it with the plugin commands in VS Code or a terminal. Watch does **not** work in Claude Chat or Cowork; [see why](#chat-cowork-and-browser-apps).
@@ -31,10 +48,10 @@ Choose **one installation method** for your agent. If Watch is already installed
 4. In **URL**, paste the address below. If a picker opens, paste into its search field and select **Use** for that URL. Click **Sync**.
 
 ```text
-https://github.com/bradautomates/claude-video
+https://github.com/Itsme23476/watch-skill
 ```
 
-![Marketplace URL form filled with the public claude-video GitHub address and a Sync button](docs/images/install/claude-marketplace-url.png)
+![Marketplace URL form filled with the public watch-skill GitHub address and a Sync button](docs/images/install/claude-marketplace-url.png)
 
 5. Find **Watch** in the added marketplace and install it. Adding the marketplace alone does not install Watch.
 6. Start a **Code** session and ask it to use the watch skill. Watch does not work in Cowork tasks ([why](#chat-cowork-and-browser-apps)). Continue with [your first video](#try-your-first-video).
@@ -49,7 +66,7 @@ If you do not see these controls, update Claude Desktop. On a managed account, y
 
 ```text
 Use $skill-installer to install the watch skill from:
-https://github.com/bradautomates/claude-video/tree/main/skills/watch
+https://github.com/Itsme23476/watch-skill/tree/main/skills/watch
 ```
 
 Let Codex finish the installation, then start a new turn or session and ask it to use **watch**. If the skill does not appear, restart Codex. You do not need Node/npm for this route. See [OpenAI's skill installation guide](https://learn.chatgpt.com/docs/build-skills#install-curated-skills-for-local-use).
@@ -60,14 +77,14 @@ Let Codex finish the installation, then start a new turn or session and ask it t
 If you already have the Codex CLI installed, run these **in your computer's terminal**, one at a time:
 
 ```bash
-codex plugin marketplace add bradautomates/claude-video
-codex plugin add watch@claude-video
+codex plugin marketplace add Itsme23476/watch-skill
+codex plugin add watch@watch-skill
 ```
 
 Start a new Codex session afterward. You can inspect the result with:
 
 ```bash
-codex plugin list --marketplace claude-video
+codex plugin list --marketplace watch-skill
 ```
 
 The desktop Plugins directory and CLI `/plugins` browser also show configured marketplaces. The IDE extension currently supports standalone skills, **not plugins**; use the message-box installation above there. This repository is a custom marketplace, so Watch will not automatically appear in the public plugin directory. [Official plugin documentation](https://learn.chatgpt.com/docs/plugins)
@@ -80,7 +97,7 @@ Continue with [your first video](#try-your-first-video).
 
 1. Open the **Claude Code** panel in VS Code.
 2. Type **`/plugins`** into the Claude Code message box to open **Manage plugins**.
-3. Select **Marketplaces** and add `bradautomates/claude-video`.
+3. Select **Marketplaces** and add `Itsme23476/watch-skill`.
 4. Return to **Plugins**, find **watch**, and choose **Install for you** to use it across your projects.
 5. Follow any activation or restart message. Then type `/watch` and select the suggested skill — normally **`/watch:watch`** — or ask Claude to use watch by name.
 
@@ -93,8 +110,8 @@ Continue with [your first video](#try-your-first-video).
 Open a terminal and start **Claude Code** with `claude`. Enter these **inside the Claude Code session**, one at a time:
 
 ```text
-/plugin marketplace add bradautomates/claude-video
-/plugin install watch@claude-video
+/plugin marketplace add Itsme23476/watch-skill
+/plugin install watch@watch-skill
 ```
 
 Follow the activation message. If Watch is not available yet, start a new Claude Code session. Type `/watch` and select **`/watch:watch`** from autocomplete. [Official installation guide](https://code.claude.com/docs/en/discover-plugins)
@@ -105,8 +122,8 @@ Follow the activation message. If Watch is not available yet, start a new Claude
 Use these executable commands instead of the slash commands:
 
 ```bash
-claude plugin marketplace add bradautomates/claude-video
-claude plugin install watch@claude-video
+claude plugin marketplace add Itsme23476/watch-skill
+claude plugin install watch@watch-skill
 ```
 
 Then start a new Claude Code session.
@@ -120,7 +137,7 @@ Continue with [your first video](#try-your-first-video).
 For other [Agent Skills hosts](https://agentskills.io), install [Node.js](https://nodejs.org/en/download) if needed, then run this **in your computer's terminal**:
 
 ```bash
-npx skills add bradautomates/claude-video -g --skill watch
+npx skills add Itsme23476/watch-skill -g --skill watch
 ```
 
 Select your agent when prompted, follow the installer's reported destination, then restart the agent. Node/npm is needed for this installer, not for Watch's Python runtime.
@@ -291,10 +308,10 @@ Update Watch using the same method you installed it with, then start a new sessi
 
 | Installation method | Update path |
 |---|---|
-| Claude Desktop | Open **Customize → Plugins → Add → Manage marketplaces**, select the `claude-video` marketplace, and update it. Check the installed Watch version afterward. |
-| Claude Code CLI | Enter `/plugin update watch@claude-video` inside Claude Code and follow the activation message. |
-| Claude Code in VS Code | Open `/plugins`, refresh `claude-video` in **Marketplaces**, and check the installed plugin. |
-| Codex native plugin | In a terminal, run `codex plugin marketplace upgrade claude-video`, then `codex plugin add watch@claude-video`. |
+| Claude Desktop | Open **Customize → Plugins → Add → Manage marketplaces**, select the `watch-skill` marketplace, and update it. Check the installed Watch version afterward. |
+| Claude Code CLI | Enter `/plugin update watch@watch-skill` inside Claude Code and follow the activation message. |
+| Claude Code in VS Code | Open `/plugins`, refresh `watch-skill` in **Marketplaces**, and check the installed plugin. |
+| Codex native plugin | In a terminal, run `codex plugin marketplace upgrade watch-skill`, then `codex plugin add watch@watch-skill`. |
 | Codex Skill Installer | Ask Codex to update the existing watch skill from this repository. The installer does not overwrite an existing skill automatically. |
 | Skills CLI | In a terminal, run `npx skills update watch -g`. |
 

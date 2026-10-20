@@ -2,6 +2,19 @@
 
 All notable changes to `/watch` are documented here.
 
+## [0.4.0] — 2026-10-20
+
+Fork of bradautomates/claude-video, now maintained at Itsme23476/watch-skill.
+
+### Added
+- `--verify` (Gemini engine): extracts one real frame at every timestamp Gemini cites (max 12) so the agent can confirm or correct the answer. Downloads YouTube media only when asked.
+- `--clip OUT --start T --end T`: frame-accurate cut of the source into OUT; refuses to overwrite.
+
+### Changed
+- First-run setup asks for the Gemini API key first and explains that without one watch only reads the transcript. Declining sets up transcript-only (local engine, captions, no speech fallback). It also states that the key is free only while no billing account is linked.
+- The SessionStart hook nudges fresh installs to run setup.
+- Repository, marketplace (`watch-skill`), and author metadata point to the fork.
+
 ## [0.3.2] — 2026-09-25
 
 ### Changed

@@ -1,21 +1,21 @@
 {
-  "name": "claude-video",
+  "name": "watch-skill",
   "metadata": {
     "description": "Give Claude a video input. /watch downloads, extracts frames, transcribes, and hands it all to Claude."
   },
   "owner": {
-    "name": "Bradley Bonanno"
+    "name": "Damianos Malliaros"
   },
   "plugins": [
     {
       "name": "watch",
       "description": "Watch a video (URL or local path). Downloads with yt-dlp, extracts frames with ffmpeg, transcribes via captions or Whisper.",
       "author": {
-        "name": "Bradley Bonanno"
+        "name": "Damianos Malliaros"
       },
       "source": "./",
       "category": "productivity",
-      "homepage": "https://github.com/bradautomates/claude-video"
+      "homepage": "https://github.com/Itsme23476/watch-skill"
     }
   ]
 }

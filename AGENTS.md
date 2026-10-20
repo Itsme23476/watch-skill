@@ -1,4 +1,4 @@
-# claude-video / watch skill
+# watch-skill / watch skill
 
 Agent Skills package that gives an agent a video input. Installable across Claude Code (most common host), Codex, Cursor, GitHub Copilot, and 50+ other [Agent Skills](https://agentskills.io) hosts. Pure-stdlib Python that orchestrates `yt-dlp` + `ffmpeg` and an optional Whisper API or separately managed local WhisperX process.
 
@@ -27,8 +27,8 @@ Agent Skills package that gives an agent a video input. Installable across Claud
 
 | Surface | Install |
 |---------|---------|
-| Claude Code | `/plugin marketplace add bradautomates/claude-video` then `/plugin install watch@claude-video` |
-| Codex / Cursor / Copilot / +50 | `npx skills add bradautomates/claude-video -g` |
+| Claude Code | `/plugin marketplace add Itsme23476/watch-skill` then `/plugin install watch@watch-skill` |
+| Codex / Cursor / Copilot / +50 | `npx skills add Itsme23476/watch-skill -g` |
 | claude.ai (web) | upload `dist/watch.skill` (built by `skills/watch/scripts/build-skill.sh`) |
 
 ## Commands
